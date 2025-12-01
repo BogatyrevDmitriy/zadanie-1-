@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мой ежедневник - Улучшенная версия</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
         <div class="container">
-            <h1>📝 Мой ежедневник</h1>
+            <h1><i class="fas fa-tasks"></i> Мой ежедневник</h1>
             <p class="subtitle">Организуйте свои задачи эффективно</p>
         </div>
     </header>
     
     <main class="container">
         <section class="task-form">
-            <h2>➕ Добавить новую задачу</h2>
+            <h2><i class="fas fa-plus-circle"></i> Добавить новую задачу</h2>
             <form id="addTaskForm">
                 <div class="form-group">
                     <label for="taskTitle">Название задачи *</label>
@@ -34,27 +35,39 @@
                         <option value="high">Высокий</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">Добавить задачу</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Добавить задачу
+                </button>
             </form>
         </section>
         
         <section class="tasks-container">
             <div class="tasks-header">
-                <h2>📋 Мои задачи</h2>
+                <h2><i class="fas fa-tasks"></i> Мои задачи</h2>
                 <div class="tasks-controls">
                     <span class="task-count" id="taskCount">0 задач</span>
-                    <button class="btn btn-secondary" id="clearAllBtn">Очистить все</button>
+                    <div class="filters">
+                        <button class="filter-btn active" data-filter="all">Все</button>
+                        <button class="filter-btn" data-filter="active">Активные</button>
+                        <button class="filter-btn" data-filter="completed">Выполненные</button>
+                    </div>
+                    <button class="btn btn-secondary" id="clearAllBtn">
+                        <i class="fas fa-trash-alt"></i> Очистить все
+                    </button>
                 </div>
             </div>
             
             <div class="tasks-grid" id="tasksList">
                 <div class="empty-state" id="emptyState">
+                    <i class="fas fa-check-circle"></i>
                     <p>🎉 Отличная работа!</p>
                     <p>Все задачи выполнены. Добавьте новую задачу чтобы продолжить.</p>
                 </div>
             </div>
         </section>
     </main>
+    
+    <div class="notification" id="notification">Задача успешно добавлена!</div>
 
     <script src="script.js"></script>
 </body>
