@@ -1,195 +1,300 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Элементы DOM
     const addTaskForm = document.getElementById('addTaskForm');
-    const taskTitleInput = document.getElementById('taskTitle');
-    const taskDescriptionInput = document.getElementById('taskDescription');
-    const taskPriorityInput = document.getElementById('taskPriority');
     const tasksList = document.getElementById('tasksList');
-    const taskCount = document.getElementById('taskCount');
     const emptyState = document.getElementById('emptyState');
+    const taskCount = document.getElementById('taskCount');
     const clearAllBtn = document.getElementById('clearAllBtn');
+    const notification = document.getElementById('notification');
+    const filterButtons = document.querySelectorAll('.filter-btn');
     
+    // Переменные состояния
     let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let currentFilter = 'all';
     
-    function updateTaskCount() {
-        const count = tasks.length;
-        taskCount.textContent = `${count} ${getTaskWordForm(count)}`;
-        
-        if (count === 0) {
-            emptyState.style.display = 'block';
-            clearAllBtn.style.display = 'none';
-        } else {
-            emptyState.style.display = 'none';
-            clearAllBtn.style.display = 'inline-flex';
-        }
-        
-        saveTasksToLocalStorage();
-    }
+    // Инициализация приложения
+    initApp();
     
-    function getTaskWordForm(count) {
-        if (count % 10 === 1 && count % 100 !== 11) {
-            return 'задача';
-        } else if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
-            return 'задачи';
-        } else {
-            return 'задач';
+    // Инициализация приложения
+    function initApp() {
+        updateTaskCount();
+        renderTasks();
+        setupEventListeners();
+        
+        // Добавление демо-задач при первом запуске
+        if (tasks.length === 0) {
+            addDemoTasks();
         }
     }
     
-    function getPriorityText(priority) {
-        const priorities = {
-            'low': 'Низкий',
-            'medium': 'Средний',
-            'high': 'Высокий'
+    // Настройка обработчиков событий
+    function setupEventListeners() {
+        // Обработчик отправки формы
+        addTaskForm.addEventListener('submit', handleAddTask);
+        
+        // Очистка всех задач
+        clearAllBtn.addEventListener('click', handleClearAll);
+        
+        // Фильтрация задач
+        filterButtons.forEach(button => {
+            button.addEventListener('click', handleFilterChange);
+        });
+    }
+    
+    // Обработчик добавления задачи
+    function handleAddTask(e) {
+        e.preventDefault();
+        
+        const title = document.getElementById('taskTitle').value.trim();
+        const description = document.getElementById('taskDescription').value.trim();
+        const priority = document.getElementById('taskPriority').value;
+        
+        if (!title) {
+            showNotification('Введите название задачи!', true);
+            return;
+        }
+        
+        // Создание новой задачи
+        const newTask = {
+            id: Date.now(),
+            title: title,
+            description: description,
+            priority: priority,
+            completed: false,
+            date: new Date().toLocaleDateString('ru-RU')
         };
-        return priorities[priority] || 'Средний';
+        
+        // Добавление задачи в массив
+        tasks.unshift(newTask);
+        
+        // Сохранение в localStorage
+        saveTasks();
+        
+        // Обновление интерфейса
+        renderTasks();
+        updateTaskCount();
+        
+        // Показ уведомления
+        showNotification('Задача успешно добавлена!');
+        
+        // Очистка формы
+        addTaskForm.reset();
+        document.getElementById('taskPriority').value = 'medium';
     }
     
-    function getPriorityClass(priority) {
-        return `priority-${priority}`;
+    // Обработчик очистки всех задач
+    function handleClearAll() {
+        if (tasks.length === 0) return;
+        
+        if (confirm('Вы уверены, что хотите удалить все задачи?')) {
+            tasks = [];
+            saveTasks();
+            renderTasks();
+            updateTaskCount();
+            showNotification('Все задачи удалены!');
+        }
     }
     
+    // Обработчик изменения фильтра
+    function handleFilterChange() {
+        // Обновление активной кнопки
+        filterButtons.forEach(btn => btn.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Установка фильтра
+        currentFilter = this.dataset.filter;
+        
+        // Рендеринг задач с учетом фильтра
+        renderTasks();
+    }
+    
+    // Функция рендеринга задач
     function renderTasks() {
+        // Очистка списка
         tasksList.innerHTML = '';
         
-        if (tasks.length === 0) {
+        // Фильтрация задач
+        let filteredTasks = tasks;
+        if (currentFilter === 'active') {
+            filteredTasks = tasks.filter(task => !task.completed);
+        } else if (currentFilter === 'completed') {
+            filteredTasks = tasks.filter(task => task.completed);
+        }
+        
+        // Проверка на пустой список
+        if (filteredTasks.length === 0) {
             tasksList.appendChild(emptyState);
             emptyState.style.display = 'block';
             return;
         }
         
-        tasks.forEach((task, index) => {
-            const taskCard = document.createElement('div');
-            taskCard.className = `task-card ${getPriorityClass(task.priority)}`;
-            taskCard.innerHTML = `
-                <div class="task-header">
-                    <h3 class="task-title">${escapeHtml(task.title)}</h3>
-                    <span class="task-priority ${getPriorityClass(task.priority)}">
-                        ${getPriorityText(task.priority)}
-                    </span>
-                </div>
-                ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ''}
-                <div class="task-actions">
-                    <button class="btn btn-danger" data-index="${index}">
-                        🗑️ Удалить
-                    </button>
-                </div>
-            `;
-            
-            tasksList.appendChild(taskCard);
-        });
+        emptyState.style.display = 'none';
         
-        document.querySelectorAll('.btn-danger').forEach(button => {
-            button.addEventListener('click', function() {
-                const index = parseInt(this.getAttribute('data-index'));
-                deleteTask(index);
-            });
+        // Рендеринг задач
+        filteredTasks.forEach(task => {
+            const taskElement = createTaskElement(task);
+            tasksList.appendChild(taskElement);
         });
     }
     
+    // Создание элемента задачи
+    function createTaskElement(task) {
+        const taskCard = document.createElement('div');
+        taskCard.className = `task-card ${task.priority} ${task.completed ? 'completed' : ''} fade-in`;
+        taskCard.dataset.id = task.id;
+        
+        // Определение приоритета
+        let priorityText, priorityClass;
+        switch (task.priority) {
+            case 'low':
+                priorityText = 'Низкий';
+                priorityClass = 'priority-low';
+                break;
+            case 'medium':
+                priorityText = 'Средний';
+                priorityClass = 'priority-medium';
+                break;
+            case 'high':
+                priorityText = 'Высокий';
+                priorityClass = 'priority-high';
+                break;
+        }
+        
+        taskCard.innerHTML = `
+            <div class="task-header">
+                <div class="task-title">${escapeHtml(task.title)}</div>
+                <span class="task-priority ${priorityClass}">${priorityText}</span>
+            </div>
+            ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+            <div class="task-footer">
+                <div class="task-date">${task.date}</div>
+                <div class="task-actions">
+                    <button class="btn btn-${task.completed ? 'secondary' : 'success'} btn-sm complete-btn">
+                        <i class="fas fa-${task.completed ? 'undo' : 'check'}"></i> ${task.completed ? 'Возобновить' : 'Выполнить'}
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-btn">
+                        <i class="fas fa-trash"></i> Удалить
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Добавление обработчиков событий
+        const completeBtn = taskCard.querySelector('.complete-btn');
+        const deleteBtn = taskCard.querySelector('.delete-btn');
+        
+        completeBtn.addEventListener('click', function() {
+            toggleTaskComplete(task.id);
+        });
+        
+        deleteBtn.addEventListener('click', function() {
+            deleteTask(task.id);
+        });
+        
+        return taskCard;
+    }
+    
+    // Переключение статуса задачи
+    function toggleTaskComplete(taskId) {
+        const taskIndex = tasks.findIndex(task => task.id === taskId);
+        if (taskIndex !== -1) {
+            tasks[taskIndex].completed = !tasks[taskIndex].completed;
+            saveTasks();
+            renderTasks();
+            updateTaskCount();
+            
+            const task = tasks[taskIndex];
+            showNotification(`Задача "${task.title}" ${task.completed ? 'выполнена' : 'возобновлена'}!`);
+        }
+    }
+    
+    // Удаление задачи
+    function deleteTask(taskId) {
+        const taskIndex = tasks.findIndex(task => task.id === taskId);
+        if (taskIndex !== -1) {
+            const taskTitle = tasks[taskIndex].title;
+            tasks.splice(taskIndex, 1);
+            saveTasks();
+            renderTasks();
+            updateTaskCount();
+            showNotification(`Задача "${taskTitle}" удалена!`);
+        }
+    }
+    
+    // Обновление счетчика задач
+    function updateTaskCount() {
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(task => task.completed).length;
+        const activeTasks = totalTasks - completedTasks;
+        
+        let countText = `${totalTasks} задач`;
+        if (totalTasks > 0) {
+            countText += ` (${activeTasks} активных, ${completedTasks} выполненных)`;
+        }
+        
+        taskCount.textContent = countText;
+    }
+    
+    // Сохранение задач в localStorage
+    function saveTasks() {
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+    
+    // Показать уведомление
+    function showNotification(message, isError = false) {
+        notification.textContent = message;
+        notification.className = 'notification';
+        
+        if (isError) {
+            notification.classList.add('error');
+        }
+        
+        notification.classList.add('show');
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+    
+    // Экранирование HTML для безопасности
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
     
-    function addTask(title, description, priority) {
-        const newTask = {
-            title: title,
-            description: description,
-            priority: priority,
-            id: Date.now(),
-            createdAt: new Date().toISOString()
-        };
+    // Добавление демо-задач при первом запуске
+    function addDemoTasks() {
+        const demoTasks = [
+            {
+                id: 1,
+                title: "Изучить JavaScript",
+                description: "Повторить основные концепции и функции ES6+",
+                priority: "high",
+                completed: false,
+                date: new Date().toLocaleDateString('ru-RU')
+            },
+            {
+                id: 2,
+                title: "Подготовить отчет",
+                description: "Завершить квартальный отчет по проекту",
+                priority: "medium",
+                completed: true,
+                date: new Date().toLocaleDateString('ru-RU')
+            },
+            {
+                id: 3,
+                title: "Купить продукты",
+                description: "Молоко, хлеб, яйца, фрукты",
+                priority: "low",
+                completed: false,
+                date: new Date().toLocaleDateString('ru-RU')
+            }
+        ];
         
-        tasks.push(newTask);
-        updateTaskCount();
+        tasks = demoTasks;
+        saveTasks();
         renderTasks();
-        showNotification('Задача успешно добавлена!', 'success');
+        updateTaskCount();
     }
-    
-    function deleteTask(index) {
-        if (confirm('Вы уверены, что хотите удалить эту задачу?')) {
-            const taskTitle = tasks[index].title;
-            tasks.splice(index, 1);
-            updateTaskCount();
-            renderTasks();
-            showNotification(`Задача "${taskTitle}" удалена`, 'info');
-        }
-    }
-    
-    function clearAllTasks() {
-        if (tasks.length === 0) {
-            showNotification('Нет задач для очистки', 'info');
-            return;
-        }
-        
-        if (confirm(`Вы уверены, что хотите удалить все задачи (${tasks.length})?`)) {
-            tasks = [];
-            updateTaskCount();
-            renderTasks();
-            showNotification('Все задачи удалены', 'info');
-        }
-    }
-    
-    function showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.transform = 'translateX(0)';
-        }, 100);
-        
-        setTimeout(() => {
-            notification.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                document.body.removeChild(notification);
-            }, 300);
-        }, 3000);
-    }
-    
-    function saveTasksToLocalStorage() {
-        localStorage.setItem('tasks', JSON.stringify(tasks));
-    }
-    
-    addTaskForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const title = taskTitleInput.value.trim();
-        const description = taskDescriptionInput.value.trim();
-        const priority = taskPriorityInput.value;
-        
-        if (!title) {
-            showNotification('Пожалуйста, введите название задачи', 'error');
-            taskTitleInput.focus();
-            return;
-        }
-        
-        addTask(title, description, priority);
-        
-        taskTitleInput.value = '';
-        taskDescriptionInput.value = '';
-        taskPriorityInput.value = 'medium';
-        taskTitleInput.focus();
-    });
-    
-    clearAllBtn.addEventListener('click', clearAllTasks);
-    
-    updateTaskCount();
-    renderTasks();
 });
